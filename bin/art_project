@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+
+bindir = File.dirname(__FILE__)
+rootdir = File.dirname(bindir) 
+
+require rootdir + '/generator/project.rb'

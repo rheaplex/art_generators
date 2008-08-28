@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Utility function
+
+die(){
+    echo $1
+    exit $2
+}
+
+# Install the gem and make a project
+
+(test -e art_generator*.gem &&
+sudo gem install art_generator) || 
+  die "Failed installing gem" 1
+
+(rm -rf test && art_project test) || 
+  die "Failed making test project" 1
+
+# Make a work and make a derivative of it
+
+cd test 
+script/work work.svg && script/work -c work.svg work2.svg
+cd ..
+
+# Report on the success or failure of these operations
+
+echo "Start tests."
+
+if [ -e "./test" ]; then
+    echo ok: make project folder
+else
+    echo FAIL: make test folder
+fi
+
+if [ "$(ls test/preparatory | grep work)" != "" ]; then
+    echo ok: make work
+else
+    echo FAIL: make work
+fi
+
+if [ "$(ls test/preparatory | grep work2)" != "" ]; then
+    echo ok: Make derivative work
+else
+    echo FAIL: make derivative work
+fi
+
+echo "Finish tests." 

@@ -1,0 +1,64 @@
+art_generators - Create & manage the lifecycle of digital art projects
+======================================================================
+
+NOT READY FOR USE YET.
+
+Currently only SVG-based projects are supported.
+
+Inspired by Ruby on Rails.
+
+
+Making a Project
+----------------
+
+> art_project project-name
+
+This will create a folder named project-name.
+
+The folder contains a number of files and directories.
+
+Edit README to describe the project, and COPYING to describe the license terms of the project.
+
+The Resources folder contains template.svg, which you can edit to set a default paper size and other features.
+
+
+Making a Work
+-------------
+
+In the project folder, type:
+
+> script/work new-work.svg
+
+This will make a new work called new-work.svg in the Preparatory directory by copying resources/template.svg.
+
+If you wish to start from another work in the Preparatory folder, type:
+
+> script/work -c new-work.svg even-newer-work.svg
+
+This will make a new work called new-work.svg in the Preparatory directory by copying Preparatory/new-work.svg .
+
+If you wish to start from another work in the another folder within the project folder, type:
+
+> script/work -c Final/new-work.svg even-newer-work.svg
+
+This will make a new work called new-work.svg in the Preparatory directory by copying Final/new-work.svg .
+
+Specifying works to copy with a slash in the name will cause the work to be copied from that folder in the project directory, not specifying a folder will default to the Preparatory folder.
+
+
+Changing a Work's Status
+------------------------
+
+TODO
+
+
+Creating a Release of a Project
+-------------------------------
+
+TODO
+
+
+Creating a Web Page for a Project
+---------------------------------
+
+TODO

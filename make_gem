@@ -1,0 +1,4 @@
+#!/bin/bash
+
+gem build art_generators.gemspec
+
