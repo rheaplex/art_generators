@@ -1,5 +1,21 @@
 #!/usr/env ruby
 
+#    art_generators - create and manage digital art project directory structures
+#    Copyright (C) 2008 Rob Myers
+# 
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+# 
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+#    GNU General Public License for more details.
+# 
+#    You should have received a copy of the GNU General Public License
+#    along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 # == Synopsis
 #    Creates a directory structure for an SVG-based art project
 #    and populates it with useful resources and scripts.
@@ -18,6 +34,9 @@
 #   -v, --version       Display version number
 #   -a, --artist        Your name
 #   -l, --license       Set the Creative Commons license URL for the project
+#   -g, --git           Use the git version control system for the project
+#   -d, --date          The year(s) for the copyright message
+#
 #
 # == Author
 #    Rob Myers <rob@robmyers.org>
@@ -29,8 +48,9 @@
 
 require 'fileutils'
 require 'optparse' 
+require 'ostruct'
 require 'rdoc/usage'
-
+#require 'liblicense'
 
 class ArtProject
   VERSION = "0.0.1"
@@ -43,12 +63,7 @@ class ArtProject
     @source_dir = File.dirname(@generator_dir)
     @template_dir = @source_dir + '/templates'
     
-    @project_name = ''
-    @project_license_id = ''
-    @project_license_metadata = ''
-    @project_license_full_text = ''
-    @project_dir = ''
-    @project_artist = ''
+    initialize_project_details
   end
   
   def run
@@ -62,16 +77,29 @@ class ArtProject
   
   protected
   
+  def initialize_project_details
+    @project = OpenStruct.new
+    @project.name = ''
+    @project.license_id = ''
+    @project.license_metadata = ''
+    @project.license_full_text = ''
+    @project.dir = ''
+    @project.artist = ''
+    @project.use_git = false
+    @project.use_svn = false
+  end
+  
   def parsed_options?
     opts = OptionParser.new       
     opts.on('-v', '--version')  { output_version ; exit 0 }
     opts.on('-h', '--help')     { output_help }
-    opts.on('-l', '--license')  do |license|
-      @project_license_id << license || ''
-    end       
-    opts.on('-a', '--artist')  do |artist|
-      @project_artist << artist || ''
-    end       
+    opts.on("-g", "--git")      {|git| @project.use_git << git}
+    #opts.on("-s", "--svn")     {|svn| @project.use_svn << svn}
+    #opts.on('-l LICENSE', '--license LICENSE')  do |license|
+    #  @project.license_id << license
+    #end 
+    opts.on('-a', '--artist')  { |artist| @project.artist << artist }
+    opts.on("-d DATE", "--date DATE") {|date| @project.date << date}
     # This consumes matched arguments from @arguments
     opts.parse!(@arguments) rescue return false
     process_options
@@ -92,13 +120,17 @@ class ArtProject
     if @arguments[0] == nil
       return false
     end
+    #if @project.git && @project.svn
+    #  puts "Both git and svn specified. Please one or the other, not both."
+    #  return false
+    #end
     #TODO Check the licence id is valid
     true
   end
   
   def process_arguments
-    @project_name = @arguments[0] # nil if unsupplied
-    @project_dir = Dir.pwd + "/" + @project_name
+    @project.name = @arguments[0] # nil if unsupplied
+    @project.dir = Dir.pwd + "/" + @project.name
   end
   
   def output_help
@@ -120,17 +152,20 @@ class ArtProject
   end
   
   def make_directories
-    FileUtils.mkdir_p @project_dir
-    FileUtils.mkdir_p @project_dir + "/discard"
-    FileUtils.mkdir_p @project_dir + "/final"
-    FileUtils.mkdir_p @project_dir + "/preparatory"
-    FileUtils.mkdir_p @project_dir + "/releases"
-    FileUtils.mkdir_p @project_dir + "/resources"
-    FileUtils.mkdir_p @project_dir + "/script"
+    if File.exists? @project.dir
+      die "Cannot create project. Directory named {@project.dir} already exists. Please rename or move the existing directory."
+    end
+    FileUtils.mkdir_p @project.dir
+    FileUtils.mkdir_p @project.dir + "/discard"
+    FileUtils.mkdir_p @project.dir + "/final"
+    FileUtils.mkdir_p @project.dir + "/preparatory"
+    FileUtils.mkdir_p @project.dir + "/releases"
+    FileUtils.mkdir_p @project.dir + "/resources"
+    FileUtils.mkdir_p @project.dir + "/script"
   end
   
   def make_script_link(name)
-    script=@project_dir + "/script/" + name
+    script=@project.dir + "/script/" + name
     File.open(script, 'w') {|f| 
       f.puts("#!/usr/bin/env ruby")
       f.puts("$project_dir=File.dirname(File.dirname(File.expand_path(__FILE__)))")
@@ -145,14 +180,19 @@ class ArtProject
   end
   
   def make_files
-    File.open(@project_dir + "/resources/license.xml", 'w') {|f| 
-      f.write(@project_license_metadata) }
-    File.open(@project_dir + "/COPYING", 'w') {|f| 
-      f.write(@project_license_full_text) }
-    File.open(@project_dir + "/README", 'w') {|f| 
-      f.write(@project_name + " by " + @project_artist +
+    File.open(@project.dir + "/resources/license.xml", 'w') {|f| 
+      f.write(@project.license_metadata) }
+    File.open(@project.dir + "/COPYING", 'w') {|f| 
+      f.write(@project.license_full_text) }
+    File.open(@project.dir + "/README", 'w') {|f| 
+      f.write(@project.name + " by " + @project.artist +
               ".\nSee COPYING for license.\n") }
-    FileUtils.cp(@template_dir + "/template.svg", @project_dir + "/resources")
+    FileUtils.cp(@template_dir + "/template.svg", @project.dir + "/resources")
+  end
+  
+  def initialize_version_control
+    Kernel.system('git-init') if @project.use_git
+    #Kernel.system('svn-init') if @project.use_svn
   end
   
   def process_command
@@ -160,6 +200,7 @@ class ArtProject
     make_directories
     make_script_links
     make_files
+    initialize_version_control
   end
 end
 

@@ -1,15 +1,17 @@
 art_generators - Create & manage the lifecycle of digital art projects
 ======================================================================
 
-NOT READY FOR USE YET.
+NOT READY FOR USE YET
+
+NOT ALL DESCRIBED FEATURES ARE IMPLEMENTED
 
 Currently only SVG-based projects are supported.
 
 Inspired by Ruby on Rails.
 
 
-Making a Project
-----------------
+Creating a Project
+------------------
 
 > art_project project-name
 
@@ -21,9 +23,11 @@ Edit README to describe the project, and COPYING to describe the license terms o
 
 The Resources folder contains template.svg, which you can edit to set a default paper size and other features.
 
+If you specify a version control system as an option (e.g. --git), the project directory will be initialised for that system and the project scripts will try to work with it.
 
-Making a Work
--------------
+
+Creating a Work
+---------------
 
 In the project folder, type:
 
@@ -49,16 +53,73 @@ Specifying works to copy with a slash in the name will cause the work to be copi
 Changing a Work's Status
 ------------------------
 
-TODO
+> script/status --final mywork.svg
+
+Copies the file mywork.svg from workspace directory to the final directory.
+
+If you are using git or svn to version control the project this command notifies them of the change.
 
 
 Creating a Release of a Project
 -------------------------------
 
-TODO
+> script/release 0.1
+
+Creates an archive called project_name_0.1.tar.gz containing the final, discard and preparatory folders along with the LICENSE and README files.
 
 
 Creating a Web Page for a Project
 ---------------------------------
 
-TODO
+>script/web
+
+Creates png images and thumbnails of the contents of the final directory and creates a web page containing them in the web directory.
+
+
+Example of Use
+--------------
+
+Create a project:
+
+> art_project test
+
+Change to the project directory:
+
+> cd test
+
+Create a work:
+
+> script/work first.svg
+
+Edit it:
+
+> inkscape preparatory/first.svg
+
+Create various other works and edit them:
+
+> script/work -c first.svg workX.svg
+...
+
+Decide some are good and some are bad:
+
+> script/status --final work1.svg
+> script/status --discard work2.svg
+...
+
+Make a release archive:
+
+> script/release 0.0.1
+
+make a web page:
+
+> script/web
+
+Have a rest, then start making more works.
+
+
+Design Notes
+------------
+
+The directory structure and the tasks performed by the scripts come from the workflow Rob Myers developed for use in his own digital art projects.
+
+The idea of a system to generate a well-structured system of directories, files and scripts for use in a workflow comes from Ruby on Rails.
