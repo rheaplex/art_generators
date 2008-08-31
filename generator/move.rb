@@ -16,22 +16,30 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+require 'fileutils'
+require 'optparse' 
+require 'rdoc/usage'
+
 # == Synopsis
-#    Copies an existing work (or the project template) to start a new work.
+#    Moves an existing work (or the project template) to another folder in the
+#    project, changing its status, and inform the version control system of the
+#    change if using one.
 #
 # == Examples
-#    Create an artwork called flowers based on a work called leaves.svg:
-#    art_project -c leaves.svg flowers.svg
+#    Move an artwork called flowers.svg to the final folder:
+#    move --final flowers.svg
 #
 # == Usage
-#    work [options] work_name
+#    move [options] work_name
 #
 #    For help use: art_work -h
 #
 # == Options
 #   -h, --help          Displays help message
 #   -v, --version       Display version number
-#   -c, --copy        Base on this work
+#   -d, --discard       Move to the discard directory
+#   -f, --final         Move to the final directory (default)
+#   -p, --preparatory   Move to the preparatory directory
 #
 # == Author
 #    Rob Myers <rob@robmyers.org>
@@ -40,11 +48,7 @@
 #    Copyright (C) 2008 Rob Myers. Licensed under the GNU GPL 3 or later.
 #    http://www.gnu.org/licenses/gpl-3.0.html
 
-require 'fileutils'
-require 'optparse'
-require 'rdoc/usage'
-
-class ArtWork
+class Move
   VERSION = "0.0.1"
   
   def initialize(arguments)    
@@ -53,10 +57,9 @@ class ArtWork
     # Here __FILE__ is the path to the symbolic link to the script
     @project_dir = $project_dir
     @project_name = File.basename(@project_dir)
-    @work_dir = "#{@project_dir}/preparatory"
-    @resource_dir = "#{@project_dir}/resources"
-    @source_work_name = "#{@resource_dir}/template.svg"
-    @destination_work_name = nil
+    @status = "final"
+    @work = nil
+    @destination = nil
   end
   
   def run
@@ -74,10 +77,9 @@ class ArtWork
     opts = OptionParser.new       
     opts.on('-v', '--version')        { output_version ; exit 0 }
     opts.on('-h', '--help')           { output_help }
-    opts.on('-c FILE', '--copy FILE') do |source|
-      @source_work_name = "#{@work_dir}/#{source}" || 
-        "#{@resource_dir}/template.svg"
-    end
+    opts.on('-d', '--discard')          { @status = 'discard' }
+    opts.on('-f', '--final')          { @status = 'final' }
+    opts.on('-p', '--preparatory')    { @status = 'preparatory' }
     # This consumes matched arguments from @arguments
     opts.parse!(@arguments) rescue return false
     process_options
@@ -95,16 +97,26 @@ class ArtWork
   end
   
   def arguments_valid?
-    if @arguments.length != 1
-      puts "No work file name specified."
-      return false
-    end
+    @arguments.length == 1
     # And the argument refers to an existing file
-    return true
+  end
+  
+  def file_of_status file, status
+    "#{status}/#{File.basename(file)}"
+  end
+    
+  def file_path_in_project name
+    # Default to preparatory if no directory provided
+    if name.index('/') == nil
+      "preparatory/" + name
+    else
+      name
+    end
   end
   
   def process_arguments
-    @destination_work_name = "#{@work_dir}/#{@arguments[0]}"
+    @work = file_path_in_project @arguments[0]
+    @destination = file_of_status @work, @status
   end
   
   def output_help
@@ -120,9 +132,9 @@ class ArtWork
     puts "#{File.basename(__FILE__)} version #{VERSION}"
   end
   
-  def make_work_file
-    FileUtils.cp(@source_work_name, 
-                 @destination_work_name)
+  def change_work_status
+    FileUtils.mv(@work, 
+                 @destination)
   end
    
   def using_git?
@@ -133,24 +145,20 @@ class ArtWork
       File.exists?("#{@project_path}/.svn")
   end
 
-  def add_work_to_version_control
-    Kernel.system("git add  #{@destination_work_name}") if using_git?
-    Kernel.system("svn add  #{@destination_work_name}") if using_svn?
+  def move_work_in_version_control
+    Kernel.system("git mv #{@work} #{@destination}") if using_git?
+    Kernel.system("svn mv #{@work} #{@destination}") if using_svn?
   end
 
   def process_command
-    if ! File.exists?(@source_work_name)
-      puts "File doesn't exist #{@source_work_name}"
+    if File.exists? @destination
+      puts "File already exists #{@destination}"
       exit 1
     end
-    if File.exists?(@destination_work_name)
-      puts "File already exists #{@destination_work_name}"
-      exit 1
-    end
-    make_work_file
-    add_work_to_version_control
+    change_work_status
+    move_work_in_version_control
   end
 end
 
-app = ArtWork.new(ARGV)
+app = Move.new(ARGV)
 app.run

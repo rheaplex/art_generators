@@ -16,6 +16,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+require 'date'
 require 'optparse' 
 require 'rdoc/usage'
 
@@ -27,7 +28,7 @@ require 'rdoc/usage'
 #    art_release
 #
 # == Usage
-#    art_release [options]
+#    release [options]
 #
 #    For help use: art_project -h
 #
@@ -49,12 +50,12 @@ class ArtRelease
   def initialize (arguments)    
     @arguments = arguments
 
-    
     @script_dir = File.dirname(File.expand_path(__FILE__))
     @project_dir = File.dirname(@script_dir)
     @project_name = File.basename(@project_dir)
     @archive_dir = @project_dir + "/archives"
     @archive_file = ''
+    @tag = "release_#{Date::today.to_s}"
   end
   
   def run
@@ -74,6 +75,9 @@ class ArtRelease
     opts.on('-f FILENAME', '--file FILENAME')     do |file|
       @archive_file << @archive_dir + file || "#(@archive_dir)/#(@project_name)"
     end       
+    opt.on('-t TAG', '--tag TAG') do |tag|
+      @tag = tag
+    end
     # This consumes matched arguments from @arguments
     opts.parse!(@arguments) rescue return false
     process_options
@@ -81,8 +85,8 @@ class ArtRelease
   end
   
   def process_options
-    if ! (@archive_file.ends_with ".tar.gz" ||
-          @archive_file.ends_with ".tgz")
+    if ! (@archive_file.index(".tar.gz") != nil) ||
+          (@archive_file.index(".tgz") != nil)
     @archive_file += "tar.gz"
     end
   end
@@ -114,8 +118,22 @@ class ArtRelease
       die "Failed to create archive."
     end
   end
+
+  def using_git?
+    File.exists("#{@project.project_path}/.git")
+  end
+   
+  def using_svn?
+    File.exists("#{@project.project_path}/.svn")
+  end
+  
+  def tag_release_version
+    Kernel.system("git' 'tag' @tag) if @project.git
+    #Kernel.system("svn tag #{tag}") if @project.svn
+  end
   
   def process_command
+    tag_release_version
     make_archive
   end
 end

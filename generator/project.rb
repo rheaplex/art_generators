@@ -34,9 +34,9 @@
 #   -v, --version       Display version number
 #   -a, --artist        Your name
 #   -l, --license       Set the Creative Commons license URL for the project
-#   -g, --git           Use the git version control system for the project
+#   -g, --git URL       Use the git version control system for the project
+#   -s, --svn URL       Use the svn version control system for the project
 #   -d, --date          The year(s) for the copyright message
-#
 #
 # == Author
 #    Rob Myers <rob@robmyers.org>
@@ -47,10 +47,11 @@
 
 
 require 'fileutils'
+#require 'liblicense'
 require 'optparse' 
 require 'ostruct'
 require 'rdoc/usage'
-#require 'liblicense'
+require 'yaml'
 
 class ArtProject
   VERSION = "0.0.1"
@@ -80,22 +81,31 @@ class ArtProject
   def initialize_project_details
     @project = OpenStruct.new
     @project.name = ''
-    @project.license_id = ''
-    @project.license_metadata = ''
-    @project.license_full_text = ''
-    @project.dir = ''
+    @project.unix_name = ''
     @project.artist = ''
+    @project.remote_repository = nil
     @project.use_git = false
     @project.use_svn = false
+    @project.license_uri = ''
+    
+    # Don't save to the yaml in case the directory is moved by the user
+    @project_dir = ''
+    @version_control_dir = ''
   end
   
   def parsed_options?
     opts = OptionParser.new       
     opts.on('-v', '--version')  { output_version ; exit 0 }
     opts.on('-h', '--help')     { output_help }
-    opts.on("-g", "--git")      {|git| @project.use_git << git}
-    #opts.on("-s", "--svn")     {|svn| @project.use_svn << svn}
-    #opts.on('-l LICENSE', '--license LICENSE')  do |license|
+    opts.on("-g", "--git URI")  do |uri| 
+      @project.use_git = true
+      @project.remote_repository = uri
+    end
+    opts.on("-s", "--svn URI")  do |uri| 
+      @project.use_svn = true
+      @project.remote_repository = uri
+    end 
+    #opts.on('-l LICENSE', '--license URI')  do |license|
     #  @project.license_id << license
     #end 
     opts.on('-a', '--artist')  { |artist| @project.artist << artist }
@@ -117,20 +127,40 @@ class ArtProject
   end
   
   def arguments_valid?
-    if @arguments[0] == nil
+    if @arguments.length != 1
+      puts "No project name specified."
       return false
     end
-    #if @project.git && @project.svn
-    #  puts "Both git and svn specified. Please one or the other, not both."
-    #  return false
-    #end
+    if @project.use_git && @project.use_svn
+      puts "Both git and svn specified. Please one or the other, not both."
+      return false
+    end
+    if @project.use_git
+      if @project.remote_repository.rindex('.git') == nil
+        puts "git uri must be of the format: ssh://git.com/var/git/project.git"
+        return false
+      end
+    end
+    if @project.use_svn
+      if @project.remote_repository.rindex(@project.unix_name) == nil
+        puts "svn uri must end with project name"
+        return false
+      end
+    end
     #TODO Check the licence id is valid
     true
   end
   
   def process_arguments
     @project.name = @arguments[0] # nil if unsupplied
-    @project.dir = Dir.pwd + "/" + @project.name
+    # Make a safe UNIX filename
+    #TODO: Improve this
+    @project.unix_name = @project.name.downcase.gsub(/ \//, '_')        
+    @version_control_dir = Dir.pwd + '/' + @project.unix_name
+    @project_dir = @version_control_dir
+    if @project.use_svn
+      @project_dir += '/trunk'
+    end  
   end
   
   def output_help
@@ -152,47 +182,83 @@ class ArtProject
   end
   
   def make_directories
-    if File.exists? @project.dir
-      die "Cannot create project. Directory named {@project.dir} already exists. Please rename or move the existing directory."
+    if File.exists? @project_dir
+      puts "Cannot create project. Directory named #{@project_dir} already exists. Please rename or move the existing directory."
+      exit 1
     end
-    FileUtils.mkdir_p @project.dir
-    FileUtils.mkdir_p @project.dir + "/discard"
-    FileUtils.mkdir_p @project.dir + "/final"
-    FileUtils.mkdir_p @project.dir + "/preparatory"
-    FileUtils.mkdir_p @project.dir + "/releases"
-    FileUtils.mkdir_p @project.dir + "/resources"
-    FileUtils.mkdir_p @project.dir + "/script"
+    
+    FileUtils.mkdir_p @project_dir
+    
+    if @project.use_svn
+      FileUtils.mkdir_p @version_control_dir + '/branches'
+      FileUtils.mkdir_p @version_control_dir + '/tags'
+    end
+    
+    
+    FileUtils.mkdir_p @project_dir + "/discard"
+    FileUtils.mkdir_p @project_dir + "/final"
+    FileUtils.mkdir_p @project_dir + "/preparatory"
+    FileUtils.mkdir_p @project_dir + "/releases"
+    FileUtils.mkdir_p @project_dir + "/resources"
+    FileUtils.mkdir_p @project_dir + "/script"
   end
   
   def make_script_link(name)
-    script=@project.dir + "/script/" + name
+    script="#{@project_dir}/script/#{name}"
     File.open(script, 'w') {|f| 
       f.puts("#!/usr/bin/env ruby")
       f.puts("$project_dir=File.dirname(File.dirname(File.expand_path(__FILE__)))")
-      f.puts("require '" + @generator_dir + "/" + name + ".rb'")
+      f.puts("require '#{@generator_dir}/#{name}.rb'")
       File.chmod(0700, script)}
   end
   
   def make_script_links
+    make_script_link("move")
     make_script_link("release")
     make_script_link("web")
     make_script_link("work")
   end
   
   def make_files
-    File.open(@project.dir + "/resources/license.xml", 'w') {|f| 
-      f.write(@project.license_metadata) }
-    File.open(@project.dir + "/COPYING", 'w') {|f| 
-      f.write(@project.license_full_text) }
-    File.open(@project.dir + "/README", 'w') {|f| 
-      f.write(@project.name + " by " + @project.artist +
-              ".\nSee COPYING for license.\n") }
-    FileUtils.cp(@template_dir + "/template.svg", @project.dir + "/resources")
+    #File.open("#{@project_dir}/resources/license.xml", 'w') {|f| 
+    #  f.write(@project.license_metadata) }
+    File.open("#{@project_dir}/COPYING", 'w') do |f| 
+      f.write("See: ")
+      f.write(@project.license_uri)
+    end
+    File.open("#{@project_dir}/README", 'w') do |f| 
+      f.write("#{@project.name}")
+      if @project.artist != ''
+        f.write("by #{@project.artist}\name")
+      end
+      f.write("\nSee COPYING for license.\n")
+    end
+    FileUtils.cp("#{@template_dir}/template.svg", "#{@project_dir}/resources")
+    File.open("#{@project_dir}/resources/configuration.yaml", 'w') do |f|
+      f.write(@project.marshal_dump.to_yaml)
+    end
   end
   
   def initialize_version_control
-    Kernel.system('git-init') if @project.use_git
-    #Kernel.system('svn-init') if @project.use_svn
+    if @project.use_git
+      # Need to make sure we cd .. if something fails
+      File.cd(@version_Control_dir)
+      Kernel.system('git', 'init')
+      Kernel.system('git', 'add', '.')
+      Kernel.system('git', 'commit')
+      Kernel.system('git', 'remote', 'add', 'origin', 
+                    @project.remote_repository)
+      Kernel.system('git', 'push', 'origin', 'master')
+      file.cd('..')
+   end
+     if @project.use_svn
+       Kernel.system('svn', 'import', @version_control_dir, 
+                     @project.remote_repository,
+                     "-m", "Checkin of generated directory structure.")
+       FileUtils.remove_entry_secure(@version_control_dir)
+       Kernel.system('svn', 'checkout', @project.remote_repository,
+                     @project.name)
+     end
   end
   
   def process_command
