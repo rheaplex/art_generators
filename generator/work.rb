@@ -134,8 +134,8 @@ class ArtWork
   end
 
   def add_work_to_version_control
-    Kernel.system("git add  #{@destination_work_name}") if using_git?
-    Kernel.system("svn add  #{@destination_work_name}") if using_svn?
+    Kernel.system("git", "add", "#{@destination_work_name}") if using_git?
+    Kernel.system("svn", "add", "#{@destination_work_name}") if using_svn?
   end
 
   def process_command

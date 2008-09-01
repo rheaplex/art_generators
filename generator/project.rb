@@ -194,7 +194,6 @@ class ArtProject
       FileUtils.mkdir_p @version_control_dir + '/tags'
     end
     
-    
     FileUtils.mkdir_p @project_dir + "/discard"
     FileUtils.mkdir_p @project_dir + "/final"
     FileUtils.mkdir_p @project_dir + "/preparatory"
@@ -256,7 +255,7 @@ class ArtProject
                      @project.remote_repository,
                      "-m", "Checkin of generated directory structure.")
        FileUtils.remove_entry_secure(@version_control_dir)
-       Kernel.system('svn', 'checkout', @project.remote_repository,
+       Kernel.system('svn', 'checkout', "#{@project.remote_repository}/trunk",
                      @project.name)
      end
   end

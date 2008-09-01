@@ -77,7 +77,7 @@ class Move
     opts = OptionParser.new       
     opts.on('-v', '--version')        { output_version ; exit 0 }
     opts.on('-h', '--help')           { output_help }
-    opts.on('-d', '--discard')          { @status = 'discard' }
+    opts.on('-d', '--discard')        { @status = 'discard' }
     opts.on('-f', '--final')          { @status = 'final' }
     opts.on('-p', '--preparatory')    { @status = 'preparatory' }
     # This consumes matched arguments from @arguments
@@ -146,8 +146,8 @@ class Move
   end
 
   def move_work_in_version_control
-    Kernel.system("git mv #{@work} #{@destination}") if using_git?
-    Kernel.system("svn mv #{@work} #{@destination}") if using_svn?
+    Kernel.system("git", "mv", "#{@work} #{@destination}") if using_git?
+    Kernel.system("svn", "mv", "#{@work} #{@destination}") if using_svn?
   end
 
   def process_command
